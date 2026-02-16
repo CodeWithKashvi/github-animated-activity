@@ -1,82 +1,47 @@
-export default async function handler(req, res) {
-  const query = `
-  {
-    user(login: "CodeWithKashvi") {
-      contributionsCollection {
-        contributionCalendar {
-          weeks {
-            contributionDays {
-              date
-              contributionCount
-            }
-          }
-        }
-      }
-    }
-  }`;
+const months = [];
+let lastMonth = "";
 
-  const response = await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
+days.forEach((day, i) => {
+  const month = new Date(day.date).toLocaleString("default", { month: "short" });
+  if (month !== lastMonth) {
+    months.push({ month, index: i });
+    lastMonth = month;
+  }
+});
 
-  const data = await response.json();
+const monthLabels = months.map(m => {
+  const x = (m.index * step);
+  return `<text x="${x}" y="230" font-size="12" fill="#444">${m.month}</text>`;
+}).join("");
 
-  const days = data.data.user.contributionsCollection.contributionCalendar.weeks
-    .flatMap(week => week.contributionDays);
+const svg = `
+<svg width="800" height="260" viewBox="0 0 800 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
 
-  const max = Math.max(...days.map(d => d.contributionCount));
-  const width = 700;
-  const height = 200;
-  const step = width / days.length;
+  <rect width="100%" height="100%" fill="white" rx="20"/>
 
-  let path = "";
+  <path id="graph"
+    d="${path}"
+    fill="none"
+    stroke="#00C853"
+    stroke-width="3"
+    filter="url(#glow)"/>
 
-  days.forEach((day, i) => {
-    const x = i * step;
-    const y = height - (day.contributionCount / max) * height;
+  ${monthLabels}
 
-    if (i === 0) {
-      path += `M ${x} ${y}`;
-    } else {
-      path += ` L ${x} ${y}`;
-    }
-  });
+  <circle r="10" fill="#7B1FA2" filter="url(#glow)">
+    <animateMotion dur="6s" repeatCount="indefinite">
+      <mpath href="#graph"/>
+    </animateMotion>
+  </circle>
 
-  const svg = `
-  <svg width="800" height="250" viewBox="0 0 800 250" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <filter id="glow">
-        <feGaussianBlur stdDeviation="6" result="blur"/>
-        <feMerge>
-          <feMergeNode in="blur"/>
-          <feMergeNode in="SourceGraphic"/>
-        </feMerge>
-      </filter>
-    </defs>
-
-    <rect width="100%" height="100%" fill="white" rx="20"/>
-
-    <path id="graph"
-      d="${path}"
-      fill="none"
-      stroke="#00C853"
-      stroke-width="3"
-      filter="url(#glow)"/>
-
-    <circle r="10" fill="#7B1FA2" filter="url(#glow)">
-      <animateMotion dur="6s" repeatCount="indefinite">
-        <mpath href="#graph"/>
-      </animateMotion>
-    </circle>
-
-  </svg>
-  `;
-
-  res.setHeader("Content-Type", "image/svg+xml");
-  res.send(svg);
-}
+</svg>
+`;
